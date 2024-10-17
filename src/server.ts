@@ -46,6 +46,7 @@ import { WebhookConfig } from './entities/webhookconfig';
 import * as process from "process";
 import bodyParser from 'body-parser';
 import {connect, NatsConnection} from "nats";
+import promClient from "prom-client";
 
 import {NOTIFICATION_EVENT_TOPIC} from "./pubSub/utils";
 import {PubSubServiceImpl} from "./pubSub/pubSub";
@@ -129,6 +130,12 @@ const natsEventHandler = (msg: string) => {
     const event = JSON.parse(eventAsString) as Event
     notificationService.sendNotification(event)
 }
+
+const metricsRegistry = new promClient.Registry();
+metricsRegistry.setDefaultLabels({
+    app: 'notifier',
+});
+
 app.get('/', (req, res) => res.send('Welcome to notifier Notifier!'))
 
 app.get('/health', (req, res) => {
@@ -149,5 +156,10 @@ app.post('/notify', async(req, res) => {
         res.status(response.error.statusCode).json({message:response.error.message}).send()
     }
 });
+
+app.get('/metrics', async (req, res) => {
+    res.setHeader('Content-Type', metricsRegistry.contentType);
+    res.send(await metricsRegistry.metrics());
+  });
 
 app.listen(3000, () => logger.info('Notifier app listening on port 3000!'))
